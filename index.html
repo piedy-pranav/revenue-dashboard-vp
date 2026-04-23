@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>eCommerce VP Dashboard — Amazon Industry Seminar</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    :root {
+      --dark:   #232F3E;
+      --darker: #131921;
+      --orange: #FF9900;
+      --peach:  #FEBD69;
+      --blue:   #146EB4;
+      --green:  #007600;
+      --purple: #7B2D8B;
+      --red:    #B12704;
+      --bg:     #EAEDED;
+      --card:   #FFFFFF;
+      --border: #D5D9D9;
+      --text:   #0F1111;
+      --muted:  #565959;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* ── Header ── */
+    header {
+      background: var(--darker);
+      color: #fff;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      height: 60px;
+      gap: 20px;
+      border-bottom: 3px solid var(--orange);
+      position: sticky;
+      top: 0;
+      z-index: 200;
+    }
+    .logo { font-size: 26px; font-weight: 900; color: var(--orange); letter-spacing: -1px; line-height: 1; }
+    .logo span { color: #fff; font-size: 12px; display: block; font-weight: 400; letter-spacing: 0; }
+    .header-title { font-size: 16px; font-weight: 600; }
+    .header-title small { display: block; font-size: 12px; font-weight: 400; color: #aaa; }
+    .header-badge {
+      margin-left: auto;
+      background: var(--orange);
+      color: var(--darker);
+      font-size: 11px; font-weight: 700;
+      padding: 4px 10px; border-radius: 4px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    /* ── Controls bar ── */
+    .ctrl-bar {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.07);
+      position: sticky;
+      top: 63px;
+      z-index: 100;
+    }
+    .ctrl-inner {
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 10px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .ctrl-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .ctrl-group { display: flex; align-items: center; gap: 6px; }
+    .ctrl-label {
+      font-size: 10px; font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    .ctrl-sep { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; }
+
+    select.ctrl-sel {
+      font-size: 12px;
+      padding: 5px 8px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: #fff;
+      color: var(--text);
+      cursor: pointer;
+      outline: none;
+      max-width: 190px;
+    }
+    select.ctrl-sel:focus { border-color: var(--orange); box-shadow: 0 0 0 2px rgba(255,153,0,0.2); }
+
+    .btn-grp {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .btn-tog {
+      font-size: 12px;
+      padding: 5px 11px;
+      border: none;
+      border-right: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+      white-space: nowrap;
+    }
+    .btn-tog:last-child { border-right: none; }
+    .btn-tog.active { background: var(--dark); color: #fff; font-weight: 700; }
+    .btn-tog:hover:not(.active) { background: #f3f4f4; }
+
+    .btn-reset {
+      font-size: 12px; padding: 5px 12px;
+      background: #fff; border: 1px solid var(--border); border-radius: 4px;
+      cursor: pointer; color: var(--red); font-weight: 700;
+      margin-left: auto;
+    }
+    .btn-reset:hover { background: #fef0ee; border-color: var(--red); }
+
+    /* ── Container ── */
+    .container { max-width: 1380px; margin: 0 auto; padding: 18px 20px; }
+
+    /* ── Loading ── */
+    #loading { text-align: center; padding: 80px 20px; color: var(--muted); }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--orange);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto 14px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── KPI Row (6 cards) ── */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 11px;
+      margin-bottom: 14px;
+    }
+    .kpi-card {
+      background: var(--card);
+      border-radius: 8px;
+      padding: 14px 16px;
+      border-top: 3px solid var(--orange);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+    .kpi-card.c-blue   { border-top-color: var(--blue); }
+    .kpi-card.c-peach  { border-top-color: var(--peach); }
+    .kpi-card.c-purple { border-top-color: var(--purple); }
+    .kpi-card.c-green  { border-top-color: var(--green); }
+    .kpi-card.c-red    { border-top-color: var(--red); }
+    .kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 5px; }
+    .kpi-value { font-size: 22px; font-weight: 700; color: var(--darker); line-height: 1; }
+    .kpi-sub { font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+    /* ── Charts Grid ── */
+    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .chart-card {
+      background: var(--card);
+      border-radius: 8px;
+      padding: 18px 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+    .chart-hdr { margin-bottom: 12px; }
+    .chart-title { font-size: 13px; font-weight: 700; color: var(--darker); }
+    .chart-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .chart-wrap { position: relative; height: 270px; }
+
+    footer { text-align: center; padding: 18px; font-size: 11px; color: var(--muted); margin-top: 8px; }
+
+    @media (max-width: 1100px) { .kpi-row { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 900px)  { .charts-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 640px)  { .kpi-row { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <div class="logo">amazon<span>.com</span></div>
+  <div class="header-title">
+    eCommerce Analytics
+    <small>UCLA Industry Seminar · Amazon</small>
+  </div>
+  <div class="header-badge">VP of Revenue</div>
+</header>
+
+<!-- ── Controls ── -->
+<div class="ctrl-bar">
+  <div class="ctrl-inner">
+
+    <!-- Row 1: time + metric controls -->
+    <div class="ctrl-row">
+      <div class="ctrl-group">
+        <span class="ctrl-label">Date Column</span>
+        <select id="ctrl-date" class="ctrl-sel">
+          <option value="order_purchase_timestamp">Purchase Date</option>
+          <option value="order_approved_at">Approval Date</option>
+          <option value="order_delivered_timestamp">Delivery Date</option>
+          <option value="order_estimated_delivery_date">Est. Delivery Date</option>
+        </select>
+      </div>
+      <div class="ctrl-sep"></div>
+      <div class="ctrl-group">
+        <span class="ctrl-label">Granularity</span>
+        <div class="btn-grp" id="ctrl-gran">
+          <button class="btn-tog" data-val="yearly">Year</button>
+          <button class="btn-tog active" data-val="monthly">Month</button>
+          <button class="btn-tog" data-val="weekly">Week</button>
+        </div>
+      </div>
+      <div class="ctrl-sep"></div>
+      <div class="ctrl-group">
+        <span class="ctrl-label">Chart 1 Metric</span>
+        <div class="btn-grp" id="ctrl-metric">
+          <button class="btn-tog active" data-val="revenue">Revenue</button>
+          <button class="btn-tog" data-val="orders">Purchase Count</button>
+          <button class="btn-tog" data-val="items">Items Sold</button>
+          <button class="btn-tog" data-val="late">Late Deliveries</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: dimension filters -->
+    <div class="ctrl-row">
+      <div class="ctrl-group">
+        <span class="ctrl-label">Status</span>
+        <select id="filt-status" class="ctrl-sel"><option value="">All</option></select>
+      </div>
+      <div class="ctrl-group">
+        <span class="ctrl-label">Customer State</span>
+        <select id="filt-state" class="ctrl-sel"><option value="">All</option></select>
+      </div>
+      <div class="ctrl-group">
+        <span class="ctrl-label">Category</span>
+        <select id="filt-category" class="ctrl-sel"><option value="">All</option></select>
+      </div>
+      <div class="ctrl-group">
+        <span class="ctrl-label">Payment Type</span>
+        <select id="filt-payment" class="ctrl-sel"><option value="">All</option></select>
+      </div>
+      <button id="ctrl-reset" class="btn-reset">✕ Reset Filters</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Dashboard ── -->
+<div class="container">
+
+  <div id="loading">
+    <div class="spinner"></div>
+    Loading datasets&hellip;
+  </div>
+
+  <div id="dashboard" style="display:none">
+
+    <!-- 6 KPI cards -->
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-label">Total Revenue</div>
+        <div class="kpi-value" id="kpi-revenue">—</div>
+        <div class="kpi-sub">Payment value</div>
+      </div>
+      <div class="kpi-card c-blue">
+        <div class="kpi-label">Total Orders</div>
+        <div class="kpi-value" id="kpi-orders">—</div>
+        <div class="kpi-sub">Unique orders</div>
+      </div>
+      <div class="kpi-card c-peach">
+        <div class="kpi-label">Avg Order Value</div>
+        <div class="kpi-value" id="kpi-aov">—</div>
+        <div class="kpi-sub">Revenue ÷ orders</div>
+      </div>
+      <div class="kpi-card c-purple">
+        <div class="kpi-label">Purchase Count</div>
+        <div class="kpi-value" id="kpi-items">—</div>
+        <div class="kpi-sub">Total line items</div>
+      </div>
+      <div class="kpi-card c-green">
+        <div class="kpi-label">Unique Customers</div>
+        <div class="kpi-value" id="kpi-customers">—</div>
+        <div class="kpi-sub">Distinct buyers</div>
+      </div>
+      <div class="kpi-card c-red">
+        <div class="kpi-label">Late Deliveries</div>
+        <div class="kpi-value" id="kpi-late">—</div>
+        <div class="kpi-sub">Delivered after ETA</div>
+      </div>
+    </div>
+
+    <!-- 4 charts -->
+    <div class="charts-grid">
+
+      <div class="chart-card">
+        <div class="chart-hdr">
+          <div class="chart-title" id="c1-title">Sales Revenue by Month</div>
+          <div class="chart-sub"  id="c1-sub">Total payment value processed</div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartSales"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-hdr">
+          <div class="chart-title" id="c2-title">Order Volume by Month</div>
+          <div class="chart-sub">Number of unique orders placed</div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartOrders"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-hdr">
+          <div class="chart-title">Top 10 Product Categories</div>
+          <div class="chart-sub">Ranked by number of line items ordered</div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartProducts"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-hdr">
+          <div class="chart-title" id="c4-title">% Orders from Sao Paulo by Month</div>
+          <div class="chart-sub">Share of orders by Sao Paulo customers</div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartSaoPaulo"></canvas></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<footer>UCLA Industry Seminar &middot; Amazon &middot; Open-source eCommerce dataset &middot; Built with Chart.js + PapaParse</footer>
+
+<script>
+// ── File paths ────────────────────────────────────────────────────────────────
+const BASE = 'datasets-tableau/';
+const CSVS = {
+  orders:    BASE + 'Copy of orders_rev_df.csv',
+  customers: BASE + 'Copy of df_Customers.csv',
+  items:     BASE + 'Copy of df_OrderItems.csv',
+  products:  BASE + 'Copy of df_Products.csv',
+  payments:  BASE + 'Copy of df_Payments.csv',
+};
+
+// ── Metric configs ────────────────────────────────────────────────────────────
+const METRICS = {
+  revenue: {
+    field: 'revenue',    title: 'Sales Revenue',
+    sub:   'Total payment value',
+    color: '#FF9900',    fill: 'rgba(255,153,0,0.13)',
+    fmt:   v => fmt$(v), yFmt: v => fmt$(v),
+    tipFmt: v => fmt$(v),
+  },
+  orders: {
+    field: 'orderCount', title: 'Purchase Count (Orders)',
+    sub:   'Number of unique orders',
+    color: '#146EB4',    fill: 'rgba(20,110,180,0.13)',
+    fmt:   v => (+v).toLocaleString(), yFmt: v => (+v).toLocaleString(),
+    tipFmt: v => (+v).toLocaleString(),
+  },
+  items: {
+    field: 'itemCount',  title: 'Items Sold',
+    sub:   'Total line items ordered',
+    color: '#7B2D8B',    fill: 'rgba(123,45,139,0.10)',
+    fmt:   v => (+v).toLocaleString(), yFmt: v => (+v).toLocaleString(),
+    tipFmt: v => (+v).toLocaleString(),
+  },
+  late: {
+    field: 'lateCount',  title: 'Late Deliveries',
+    sub:   'Orders delivered after estimated date',
+    color: '#B12704',    fill: 'rgba(177,39,4,0.10)',
+    fmt:   v => (+v).toLocaleString(), yFmt: v => (+v).toLocaleString(),
+    tipFmt: v => (+v).toLocaleString(),
+  },
+};
+
+const GRAN_LABEL = { yearly: 'Year', monthly: 'Month', weekly: 'Week' };
+
+// ── App state ─────────────────────────────────────────────────────────────────
+const S = {
+  dateCol: 'order_purchase_timestamp',
+  gran:    'monthly',
+  metric:  'revenue',
+  filters: { status: '', custState: '', category: '', payment: '' },
+};
+
+// ── Raw data + indexes ────────────────────────────────────────────────────────
+let R = {};   // raw arrays
+let X = {};   // indexes / lookup maps
+let CH = {};  // chart instances
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function loadCSV(path) {
+  return new Promise((resolve, reject) => {
+    Papa.parse(path, {
+      download: true, header: true, skipEmptyLines: true,
+      complete: r => resolve(r.data), error: reject,
+    });
+  });
+}
+
+function fmt$(n) {
+  if (n >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
+  return '$' + n.toFixed(0);
+}
+
+function set$(id, v) { document.getElementById(id).textContent = v; }
+
+// ISO week number for a YYYY-MM-DD string
+function isoWeek(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const day = dt.getUTCDay() || 7;
+  dt.setUTCDate(dt.getUTCDate() + 4 - day);
+  const jan4 = new Date(Date.UTC(dt.getUTCFullYear(), 0, 4));
+  const wk   = 1 + Math.ceil(((dt - jan4) / 86400000 + 1) / 7);
+  return { year: dt.getUTCFullYear(), week: wk };
+}
+
+// Return { key, label } for a timestamp string given current granularity
+function bucket(ts) {
+  if (!ts) return null;
+  const dp = ts.substring(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dp)) return null;
+  const [y, mo] = dp.split('-');
+  if (S.gran === 'yearly') {
+    return { key: y, label: y };
+  }
+  if (S.gran === 'monthly') {
+    const label = new Date(+y, +mo - 1, 1)
+      .toLocaleString('en-US', { month: 'short', year: 'numeric' });
+    return { key: `${y}-${mo}`, label };
+  }
+  // weekly
+  const { year, week } = isoWeek(dp);
+  const ww = String(week).padStart(2, '0');
+  return { key: `${year}-W${ww}`, label: `Wk${week} '${String(year).slice(2)}` };
+}
+
+// True if order was delivered after estimated date (date-string comparison)
+function isLate(o) {
+  const del = (o.order_delivered_timestamp       || '').substring(0, 10);
+  const est = (o.order_estimated_delivery_date   || '').substring(0, 10);
+  return del.length === 10 && est.length === 10 && del > est;
+}
+
+// ── Build indexes (once after load) ──────────────────────────────────────────
+function buildIndexes() {
+  X.custMap = Object.fromEntries(R.customers.map(c => [c.customer_id, c]));
+  X.prodMap = Object.fromEntries(R.products.map(p => [p.product_id, p]));
+
+  X.payByOrder = {};
+  R.payments.forEach(p => {
+    X.payByOrder[p.order_id] = (X.payByOrder[p.order_id] || 0) + (+p.payment_value || 0);
+  });
+
+  X.itemCountByOrder = {};
+  R.items.forEach(item => {
+    X.itemCountByOrder[item.order_id] = (X.itemCountByOrder[item.order_id] || 0) + 1;
+  });
+
+  // category → Set<order_id>
+  X.ordersByCat = {};
+  R.items.forEach(item => {
+    const cat = (X.prodMap[item.product_id] || {}).product_category_name;
+    if (!cat) return;
+    (X.ordersByCat[cat] = X.ordersByCat[cat] || new Set()).add(item.order_id);
+  });
+
+  // payment_type → Set<order_id>
+  X.ordersByPay = {};
+  R.payments.forEach(p => {
+    const pt = p.payment_type;
+    if (!pt) return;
+    (X.ordersByPay[pt] = X.ordersByPay[pt] || new Set()).add(p.order_id);
+  });
+}
+
+// ── Populate filter dropdowns ─────────────────────────────────────────────────
+function fillSelect(id, values) {
+  const el = document.getElementById(id);
+  [...new Set(values)].filter(Boolean).sort().forEach(v => {
+    const o = document.createElement('option');
+    o.value = o.textContent = v;
+    el.appendChild(o);
+  });
+}
+
+function populateFilters() {
+  fillSelect('filt-status',   R.orders.map(o => o.order_status));
+  fillSelect('filt-state',    R.customers.map(c => c.customer_state));
+  fillSelect('filt-category', R.products.map(p => p.product_category_name));
+  fillSelect('filt-payment',  R.payments.map(p => p.payment_type));
+}
+
+// ── Filter + aggregate ────────────────────────────────────────────────────────
+function filtered() {
+  const { status, custState, category, payment } = S.filters;
+  return R.orders.filter(o => {
+    if (status    && o.order_status !== status)                          return false;
+    if (custState && (X.custMap[o.customer_id] || {}).customer_state !== custState) return false;
+    if (category  && !X.ordersByCat[category]?.has(o.order_id))         return false;
+    if (payment   && !X.ordersByPay[payment]?.has(o.order_id))          return false;
+    return true;
+  });
+}
+
+function aggregate(orders) {
+  const bkts = {};
+  orders.forEach(o => {
+    const b = bucket(o[S.dateCol]);
+    if (!b) return;
+    let bk = bkts[b.key];
+    if (!bk) bk = bkts[b.key] = { key: b.key, label: b.label, revenue: 0, orderCount: 0, itemCount: 0, lateCount: 0, spCount: 0 };
+    bk.revenue    += X.payByOrder[o.order_id] || 0;
+    bk.orderCount += 1;
+    bk.itemCount  += X.itemCountByOrder[o.order_id] || 0;
+    if (isLate(o)) bk.lateCount += 1;
+    if (((X.custMap[o.customer_id] || {}).customer_city || '').toLowerCase().trim() === 'sao paulo') bk.spCount += 1;
+  });
+  return Object.values(bkts).sort((a, b) => a.key.localeCompare(b.key));
+}
+
+function top10(orders) {
+  const oids = new Set(orders.map(o => o.order_id));
+  const cnt  = {};
+  R.items.forEach(item => {
+    if (!oids.has(item.order_id)) return;
+    const cat = (X.prodMap[item.product_id] || {}).product_category_name || 'unknown';
+    cnt[cat] = (cnt[cat] || 0) + 1;
+  });
+  return Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 10);
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render() {
+  const orders = filtered();
+  const bkts   = aggregate(orders);
+  const cats   = top10(orders);
+  const mc     = METRICS[S.metric];
+  const gran   = GRAN_LABEL[S.gran];
+  const labels = bkts.map(b => b.label);
+  const maxTicks = S.gran === 'weekly' ? 16 : undefined;
+
+  // KPIs
+  const totRev  = bkts.reduce((s, b) => s + b.revenue,    0);
+  const totOrd  = orders.length;
+  const totItm  = bkts.reduce((s, b) => s + b.itemCount,  0);
+  const totLate = orders.filter(o => isLate(o)).length;
+  const totCust = new Set(orders.map(o => o.customer_id)).size;
+  set$('kpi-revenue',   fmt$(totRev));
+  set$('kpi-orders',    totOrd.toLocaleString());
+  set$('kpi-aov',       fmt$(totOrd > 0 ? totRev / totOrd : 0));
+  set$('kpi-items',     totItm.toLocaleString());
+  set$('kpi-customers', totCust.toLocaleString());
+  set$('kpi-late',      totLate.toLocaleString());
+
+  // Chart 1 — configurable metric
+  set$('c1-title', `${mc.title} by ${gran}`);
+  set$('c1-sub',   mc.sub);
+  const c1 = CH.sales;
+  c1.data.labels = labels;
+  c1.data.datasets[0].data                       = bkts.map(b => b[mc.field]);
+  c1.data.datasets[0].borderColor                = mc.color;
+  c1.data.datasets[0].backgroundColor            = mc.fill;
+  c1.data.datasets[0].pointBackgroundColor       = mc.color;
+  c1.options.plugins.tooltip.callbacks.label     = ctx => mc.tipFmt(ctx.raw);
+  c1.options.scales.y.ticks.callback             = mc.yFmt;
+  c1.options.scales.x.ticks.maxTicksLimit        = maxTicks;
+  c1.update();
+
+  // Chart 2 — order volume (always order count)
+  set$('c2-title', `Order Volume by ${gran}`);
+  const c2 = CH.orders;
+  c2.data.labels = labels;
+  c2.data.datasets[0].data            = bkts.map(b => b.orderCount);
+  c2.options.scales.x.ticks.maxTicksLimit = maxTicks;
+  c2.update();
+
+  // Chart 3 — top 10 categories
+  const c3 = CH.products;
+  c3.data.labels = cats.map(([c]) => c.replace(/_/g, ' '));
+  c3.data.datasets[0].data            = cats.map(([, n]) => n);
+  c3.data.datasets[0].backgroundColor = cats.map((_, i) =>
+    `rgba(255, ${Math.round(153 - i * 9)}, 0, ${Math.max(0.25, 1 - i * 0.07)})`
+  );
+  c3.update();
+
+  // Chart 4 — % Sao Paulo
+  set$('c4-title', `% Orders from Sao Paulo by ${gran}`);
+  const c4 = CH.sao;
+  c4.data.labels = labels;
+  c4.data.datasets[0].data = bkts.map(b =>
+    b.orderCount > 0 ? +(b.spCount / b.orderCount * 100).toFixed(2) : 0
+  );
+  c4.options.scales.x.ticks.maxTicksLimit = maxTicks;
+  c4.update();
+}
+
+// ── Create charts (called once) ───────────────────────────────────────────────
+function createCharts() {
+  Chart.defaults.animation.duration = 350;
+  const GRID = 'rgba(0,0,0,0.05)';
+  const tickStyle = { font: { size: 11 }, color: '#555', maxRotation: 45, autoSkip: true };
+  const baseX = { grid: { color: GRID }, ticks: tickStyle };
+  const baseY = { grid: { color: GRID }, ticks: { ...tickStyle, maxRotation: 0 } };
+
+  CH.sales = new Chart(document.getElementById('chartSales'), {
+    type: 'line',
+    data: { labels: [], datasets: [{
+      data: [], borderColor: '#FF9900', backgroundColor: 'rgba(255,153,0,0.13)',
+      borderWidth: 2.5, fill: true, tension: 0.35, pointRadius: 3, pointBackgroundColor: '#FF9900',
+    }]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmt$(ctx.raw) } } },
+      scales: { x: baseX, y: { ...baseY, ticks: { ...baseY.ticks, callback: v => fmt$(v) } } },
+    },
+  });
+
+  CH.orders = new Chart(document.getElementById('chartOrders'), {
+    type: 'bar',
+    data: { labels: [], datasets: [{
+      data: [], backgroundColor: '#146EB4', borderRadius: 4, borderSkipped: false,
+    }]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: baseX, y: baseY },
+    },
+  });
+
+  CH.products = new Chart(document.getElementById('chartProducts'), {
+    type: 'bar',
+    data: { labels: [], datasets: [{
+      data: [], backgroundColor: [], borderRadius: 4, borderSkipped: false,
+    }]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: GRID }, ticks: tickStyle },
+        y: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#555' } },
+      },
+    },
+  });
+
+  CH.sao = new Chart(document.getElementById('chartSaoPaulo'), {
+    type: 'line',
+    data: { labels: [], datasets: [{
+      data: [], borderColor: '#007600', backgroundColor: 'rgba(0,118,0,0.10)',
+      borderWidth: 2.5, fill: true, tension: 0.35, pointRadius: 3, pointBackgroundColor: '#007600',
+    }]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.raw.toFixed(1) + '%' } } },
+      scales: { x: baseX, y: { ...baseY, ticks: { ...baseY.ticks, callback: v => v.toFixed(0) + '%' } } },
+    },
+  });
+}
+
+// ── Wire up controls ──────────────────────────────────────────────────────────
+function bindControls() {
+
+  document.getElementById('ctrl-date').addEventListener('change', e => {
+    S.dateCol = e.target.value;
+    render();
+  });
+
+  document.querySelectorAll('#ctrl-gran .btn-tog').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#ctrl-gran .btn-tog').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      S.gran = btn.dataset.val;
+      render();
+    });
+  });
+
+  document.querySelectorAll('#ctrl-metric .btn-tog').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#ctrl-metric .btn-tog').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      S.metric = btn.dataset.val;
+      render();
+    });
+  });
+
+  const FILTER_MAP = {
+    'filt-status': 'status', 'filt-state': 'custState',
+    'filt-category': 'category', 'filt-payment': 'payment',
+  };
+  Object.entries(FILTER_MAP).forEach(([id, key]) => {
+    document.getElementById(id).addEventListener('change', e => {
+      S.filters[key] = e.target.value;
+      render();
+    });
+  });
+
+  document.getElementById('ctrl-reset').addEventListener('click', () => {
+    S.filters = { status: '', custState: '', category: '', payment: '' };
+    Object.keys(FILTER_MAP).forEach(id => { document.getElementById(id).value = ''; });
+    render();
+  });
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+async function boot() {
+  try {
+    const [orders, customers, items, products, payments] = await Promise.all(
+      Object.values(CSVS).map(loadCSV)
+    );
+    R = { orders, customers, items, products, payments };
+    buildIndexes();
+    populateFilters();
+    createCharts();
+    bindControls();
+    document.getElementById('loading').style.display   = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    render();
+  } catch (err) {
+    document.getElementById('loading').innerHTML =
+      `<strong style="color:#c00">Error loading data:</strong> ${err.message}<br><small>Check the browser console for details.</small>`;
+    console.error(err);
+  }
+}
+
+boot();
+</script>
+</body>
+</html>
